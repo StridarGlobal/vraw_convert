@@ -36,7 +36,7 @@ pub fn convert_vraw_to_mp4(input: &String, output: Option<String>) -> Result<(),
             .to_string()
     });
 
-    let mut f = BufReader::new(input_file);
+    let mut f: BufReader<File> = BufReader::new(input_file);
 
     let entries =
         read_index(&mut f).map_err(|e| format!("vraw_convert: failed to read index: {e}"))?;
@@ -45,10 +45,16 @@ pub fn convert_vraw_to_mp4(input: &String, output: Option<String>) -> Result<(),
         return Err("vraw_convert: index contains no frames".into());
     }
 
-    let config = Mp4Config {
+    let config: Mp4Config = Mp4Config {
         major_brand: str::parse("isom").unwrap(),
         minor_version: 512,
-        compatible_brands: vec![str::parse("hev1").unwrap()],
+        compatible_brands: vec![
+            str::parse("isom").unwrap(),
+            str::parse("iso2").unwrap(),
+            str::parse("avc1").unwrap(),
+            str::parse("mp41").unwrap(),
+            str::parse("hev1").unwrap()
+        ],        
         timescale: 1000, // This specifies milliseconds
     };
 
@@ -75,6 +81,20 @@ pub fn convert_vraw_to_mp4(input: &String, output: Option<String>) -> Result<(),
 
                 break;
             }
+            VideoCaptureFormat::H264 => {
+                // Some junk to fulfill H264 requirement for SPS/PPS. VLC corrects for anything we did wrong apparently
+                let newsps = vec![0x00, 0x00, 0x00, 0x01, 0x67, 0x42, 0x00, 0x0a, 0xf8, 0x41, 0xa2];
+                let newpps = vec![0x00, 0x00, 0x00, 0x01, 0x68, 0xce, 0x38, 0x80];                
+                mp4_writer
+                    .add_track(&TrackConfig::from(MediaConfig::AvcConfig(
+                        mp4::AvcConfig{width:0, height:0, seq_param_set:newsps, pic_param_set:newpps},
+                    )))
+                    .map_err(|_| "vraw_convert: failed to add mp4 track")?;
+
+                last_timestamp = frame.timestamp;
+
+                break;
+            }            
             VideoCaptureFormat::Stats => {
                 continue;
             }

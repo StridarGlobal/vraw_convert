@@ -14,6 +14,6 @@ byteorder = "1"
 chrono = "0.4.5"
 static_assertions = "1"
 zerocopy = "0.6.1"
-mp4 = "0.12.0"
+mp4 = "0.14.0"
 clap = {version = "4.0.18", features = ["derive"] }
 msgbox = "0.7.0"
